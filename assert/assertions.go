@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/encoding/prototext"
+	pref "google.golang.org/protobuf/reflect/protoreflect"
 	"math"
 	"os"
 	"reflect"
@@ -454,7 +456,12 @@ func formatUnequalValues(expected, actual interface{}) (e string, a string) {
 // This helps keep formatted error messages lines from exceeding the
 // bufio.MaxScanTokenSize max line length that the go testing framework imposes.
 func truncatingFormat(data interface{}) string {
-	value := fmt.Sprintf("%#v", data)
+	var value string
+	if pbData, ok := data.(proto.Message); ok {
+		value = fmt.Sprintf("%s", pbData)
+	} else {
+		value = fmt.Sprintf("%#v", data)
+	}
 	max := bufio.MaxScanTokenSize - 100 // Give us some space the type info too if needed.
 	if len(value) > max {
 		value = value[0:max] + "<... truncated>"
@@ -1619,7 +1626,12 @@ func diff(expected interface{}, actual interface{}) string {
 	}
 
 	var e, a string
-	if et != reflect.TypeOf("") {
+	if pbExp, ok := expected.(pref.ProtoMessage); ok {
+		e = prototext.MarshalOptions{Multiline: true}.Format(pbExp)
+		if pbAct, ok := actual.(pref.ProtoMessage); ok {
+			a = prototext.MarshalOptions{Multiline: true}.Format(pbAct)
+		}
+	} else if et != reflect.TypeOf("") {
 		e = spewConfig.Sdump(expected)
 		a = spewConfig.Sdump(actual)
 	} else {
